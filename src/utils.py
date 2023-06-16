@@ -12,22 +12,26 @@ def generate_anchors(featuremap, orig_shape=512, anchor_sizes = [39,46,52,58,65]
     This function generates anchor boxes for object detection based on the input feature map, anchor
     sizes, ratios, and stride.
     
-    :param featuremap: The feature map is a 3D numpy array that represents the output of a convolutional
+    @param featuremap: The feature map is a 3D numpy array that represents the output of a convolutional
     neural network (CNN) layer. It contains the features extracted from the input image
-    :param orig_shape: The original shape of the input image, defaults to 512 (optional)
-    :param anchor_sizes: The sizes of the anchors to be generated. These are the heights and widths of
+    
+    @param orig_shape: The original shape of the input image, defaults to 512 (optional)
+    
+    @param anchor_sizes: The sizes of the anchors to be generated. These are the heights and widths of
     the bounding boxes that will be used to detect objects in an image
-    :param anchor_ratios: anchor_ratios are the ratios of the width to height of the anchor boxes. For
+    
+    @param anchor_ratios: anchor_ratios are the ratios of the width to height of the anchor boxes. For
     example, if anchor_ratios=[0.5, 1, 2], it means that for each anchor size, there will be three
     anchor boxes with different width to height ratios of 1:2,
-    :param anchor_stride: anchor_stride is the distance between the centers of two adjacent anchor boxes
+    
+    @param anchor_stride: anchor_stride is the distance between the centers of two adjacent anchor boxes
     in the feature map. It is used to control the density of anchor boxes in the feature map. A smaller
     anchor stride will result in more anchor boxes being generated, while a larger anchor stride will
     result in fewer anchor boxes being generated, defaults to 1 (optional)
-    :return: a numpy array of anchor boxes generated based on the input feature map, anchor sizes,
+    
+    @return: a numpy array of anchor boxes generated based on the input feature map, anchor sizes,
     anchor ratios, anchor stride, and original image shape.
     """
-    
     
     feature_shapes = featuremap.shape[2]
     feature_strides = orig_shape/featuremap.shape[2]
@@ -63,154 +67,142 @@ def generate_anchors(featuremap, orig_shape=512, anchor_sizes = [39,46,52,58,65]
     anchors = anchors
     return anchors
 
+def read_batch(datafolder, maskfolder, jsonfile, batchlen = 5, start = 0):
+    """
+    This function reads a batch of medical images and their corresponding masks, labels, and bounding
+    boxes from a given folder and returns them as numpy arrays.
+    
+    @param datafolder: The folder path where the input images are stored
+    
+    @param maskfolder: The folder path where the mask files are stored
+    
+    @param jsonfile: The `jsonfile` parameter is a dictionary that contains information about the images
+    and their corresponding labels and bounding boxes. The keys of the dictionary are the filenames of
+    the images, and the values are dictionaries that contain the label and bounding box information
+    
+    @param batchlen: The number of images to read in each batch, defaults to 5 (optional)
+    
+    @param start: The starting index of the batch, i.e., the index of the first image to be read in the
+    batch, defaults to 0 (optional)
+    
+    @return: four arrays: x_batch, m_batch, bb_batch, and y_batch. x_batch and m_batch are 3D arrays of
+    shape (batchlen, 512, 512) with an additional dimension of size 1 at the end. bb_batch is a list of
+    bounding boxes, and y_batch is a 2D array of shape (batchlen, 2
+    """
+    x_batch = np.zeros((batchlen, 512, 512))
+    y_batch = np.zeros((batchlen, 2))
+    m_batch = np.zeros((batchlen, 512, 512))
+    bb_batch = []
+    
+    for num, imnum in enumerate(range(start, start + batchlen)):
+        filename = str(imnum).zfill(6) + '.nrrd'
+        im,h = nrrd.read(os.path.join(datafolder, filename))
+        mask,h = nrrd.read(os.path.join(maskfolder, filename))
+        x_batch[num] = im
+        m_batch[num] = mask
+        y_batch[num] = jsonfile[filename]['label']
+        bbox = jsonfile[filename]['bbox']
+        bb_batch.append(bbox)
+        
+    x_batch = np.expand_dims(x_batch, -1)
+    m_batch = np.expand_dims(m_batch, -1)
+    return x_batch, m_batch, bb_batch, y_batch
 
-def calculate_ious(bbox, anchors):
+def draw_bbox(bboxparam):
     """
-    This function calculates the intersection over union (IOU) between a bounding box and a set of
-    anchor boxes.
+    The function takes a bounding box parameter and converts it into 4 lines in matplotlib to visualize
+    it.
     
-    :param bbox: The bbox parameter is a list or array containing the coordinates of a bounding box in
-    the format [y1, x1, y2, x2], where y1 and x1 are the coordinates of the top-left corner of the box,
-    and y2 and x2 are the coordinates of the
-    :param anchors: The anchors parameter is a numpy array containing the coordinates of the anchor
-    boxes. Each row of the array represents an anchor box and contains four values: the x-coordinate of
-    the top-left corner, the y-coordinate of the top-left corner, the x-coordinate of the bottom-right
-    corner, and the y-coordinate
-    :return: an array of Intersection over Union (IoU) values between a bounding box and a set of anchor
-    boxes.
+    @param bboxparam: The parameter `bboxparam` is a list containing the coordinates of a bounding box
+    in the format [min_x, min_y, max_x, max_y]. The function `draw_bbox` converts these coordinates into
+    four lines in matplotlib to visualize the bounding box
+    
+    @return: a list of four sublists, where each sublist contains two elements representing the x and y
+    coordinates of a line segment that forms a bounding box.
     """
     
-    # area = width * height
-    anchorarea = (anchors[:,2] - anchors[:,0]) * (anchors[:,3] - anchors[:,1])
-    bboxarea = (bbox[2] - bbox[0]) * (bbox[3] * bbox[1])
+    # Convert the bounding box to 4 lines in matplotlib to visualize it. boundingbox=[min_x,min_y,max_x,max_y]
+    #in matplotlib line=start_x,end_x,start_y,end_y
+    #so line by line: lowerline=[x1,x2],[y1,y1] #upperline=[x1,x2],[y2,y2] #leftsideline=[x1,x1],[y1,y2] #rightsideline=[x2,x2],[y1,y2]
     
-    y1 = np.maximum(bbox[0], anchors[:, 0])
-    y2 = np.minimum(bbox[2], anchors[:, 2])
-    x1 = np.maximum(bbox[1], anchors[:, 1])
-    x2 = np.minimum(bbox[3], anchors[:, 3])
-    intersection = np.maximum(x2 - x1, 0) * np.maximum(y2 - y1, 0)
-    union = bboxarea + anchorarea[:] - intersection[:]
-    iou = intersection / union
+    y1 = bboxparam[0]
+    y2 = bboxparam[2]
+    x1 = bboxparam[1]
+    x2 = bboxparam[3]
     
-    return iou
+    boxlines = [x1,x2],[y1,y1],
+    [x1,x2],[y2,y2],
+    [x1,x1],[y1,y2],
+    [x2,x2],[y1,y2]
+    return boxlines
 
-def calculate_pixelwise_deltas(bbox, anchors, numof):
+def shift_bbox_pixelwise(anchors, predicted_deltas):
     """
-    This function calculates the predicted dx, dy, dw, and dh for each anchor based on the given
-    bounding box and anchor parameters.
+    This function takes in a set of anchor boxes and predicted deltas, and returns a batch of shifted
+    bounding boxes.
     
-    :param bbox: The bounding box coordinates of an object in the format [xmin, ymin, xmax, ymax]
-    :param anchors: A numpy array of shape (numof, 4) containing the coordinates of the anchor boxes.
-    Each row represents an anchor box and the four columns represent the x-coordinate of the top-left
-    corner, y-coordinate of the top-left corner, x-coordinate of the bottom-right corner, and
-    y-coordinate of
-    :param numof: The number of anchors
-    :return: a numpy array of shape (numof, 4) containing the predicted dx, dy, dw, dh values for each
-    anchor.
+    @param anchors: The anchor boxes are the reference boxes used for object detection. They are
+    pre-defined boxes of different sizes and aspect ratios that are placed at various locations in the
+    image. The model predicts the offset values for these anchor boxes to adjust their position and size
+    to better fit the object in the image
+    
+    @param predicted_deltas: predicted_deltas is a numpy array containing the predicted deltas for each
+    anchor box. The shape of the array should be (N, 4), where N is the number of anchor boxes and 4
+    represents the 4 predicted deltas for each box (delta_x, delta_y, delta_w, delta
+    
+    @return: The function `shift_bbox_pixelwise` returns a numpy array of shape `(n, 4)` where `n` is
+    the number of anchors/predicted deltas. The array contains the predicted bounding boxes after
+    applying the predicted deltas to the anchor boxes. The four columns of the array represent the x1,
+    y1, x2, and y2 coordinates of the predicted bounding boxes.
     """
-    assert len(anchors.shape) == 2, f"2 dimenzios anchors shape kell. Kapott: {str(anchors.shape)}"
-    assert len(bbox.shape) == 1, f"1 dimenzios bbox shape kell. Kapott: {str(bbox.shape)}"
     
-    # Predicted dx,dy,dw,dh for each anchor
-    deltas = np.zeros((numof, 4))
+    assert len(anchors.shape) == 2, f"Anchor shape must be 2 dimensions. We got: {str(anchors.shape)}"
+    assert len(predicted_deltas.shape) == 2, f"Predicted_deltas shape must be 2 dimensions. We got: {str(predicted_deltas.shape)}"
     
-    anchor_width = anchors[:, 2] - anchors[:, 0]
-    anchor_height = anchors[:, 3] - anchors[:, 1]
-    anchor_centerx = anchors[:, 0] + anchor_width[:]/2
-    anchor_centery = anchors[:, 1] + anchor_height[:]/2
+    anchor_widths = anchors[:, 2] - anchors[:, 0]
+    anchor_heights = anchors[:, 3] - anchors[:, 1]
+    anchor_centerx = anchors[:, 0] + anchor_widths[:]/2
+    anchor_centery = anchors[:, 1] + anchor_heights[:]/2
     
-    bbox_width = bbox[2] - bbox[0]
-    bbox_height = bbox[3] - bbox[1]
-    bbox_centerx = bbox[0] + bbox_width/2
-    bbox_centery = bbox[1] + bbox_height/2
+    pred_xc = anchor_centerx[:] + predicted_deltas[:, 0]
+    pred_yc = anchor_centery[:] + predicted_deltas[:, 1]
+    pred_widths = anchor_widths[:] + predicted_deltas[:, 2]
+    pred_heights = anchor_heights[:] + predicted_deltas[:, 3]
     
-    dw = bbox_width - anchor_width[:]
-    dh = bbox_height - anchor_height[:]
-    dx = bbox_centerx - anchor_centerx[:]
-    dy = bbox_centery - anchor_centery[:]
+    predx1 = pred_xc[:] - pred_widths[:]/2
+    predy1 = pred_yc[:] - pred_heights[:]/2
+    predx2 = pred_xc[:] + pred_widths[:]/2
+    predy2 = pred_yc[:] + pred_heights[:]/2
     
-    for anchor in range(numof):
-        deltas[anchor] = [dx[anchor], dy[anchor], dw[anchor], dh[anchor]]
-    
-    return deltas
+    batch_of_boxes = np.stack([predx1, predy1, predx2, predy2], axis=1)
+    return batch_of_boxes
 
-def calculate_exponential_deltas(bbox, anchors, numof):
+def shift_bbox_exponential(anchors,predicted_deltas):
     raise NotImplementedError('Exponential anchorbox shifting is not implemented')
 
-def indices_deltas_labels(batch_of_bboxes, anchors, batchlen, train_set_size = 20, mode = 'pixelwise'):
+def get_proposals(batch_of_pred_scores,batch_of_pred_deltas,anchors,proposal_count=20,mode='pixelwise'):
     
-    num_of_anchors = len(anchors)
-    batch_of_bboxes = np.array(batch_of_bboxes)
+    batchlen = batch_of_pred_scores.shape[0]
+    proposals, origanchors = np.zeros((batchlen, proposal_count, 4))
     
-    batch_of_indices = np.zeros((batchlen, train_set_size, 2), dtype= np.int32)
-    batch_of_deltas = np.zeros((batchlen, num_of_anchors, 4))
-    batch_of_labels = np.zeros((batchlen, train_set_size))
-    
-    for im in range(batchlen):
-        bboxes_im = np.asarray(batch_of_bboxes[im])
-        num_of_bboxes = bboxes_im.shape[0]
+    for image in range(batchlen):
+        pred_scores = batch_of_pred_scores[image]
+        pred_deltas = batch_of_pred_deltas[image]
+        # Find where predicted positive boxes
         
-        indices = np.zeros((train_set_size, 2), dtype= np.int32)
-        deltas = np.zeros((num_of_anchors, 4))
-        boxlabels = np.zeros((train_set_size))
+        positive_idxs = np.where(np.argmax(pred_scores, axis= -1) == 1)[0]
+        positive_anchors = anchors[positive_idxs]
+        selected_boxes = tf.gather(pred_deltas, positive_idxs)
+        selected_scores = tf.gather(pred_scores, positive_idxs)
+        selected_scores = selected_scores[:, 1]
         
-        if num_of_bboxes > 1:
-            
-            # Intersection over union score for each bbox-anchor pair
-            bbox_ious = np.zeros((num_of_bboxes, num_of_anchors))
-            # Desired delta x,y,h,w for each bbox-anchor pair --> RPN shoult predict these
-            bbox_deltas = np.zeros((num_of_bboxes, num_of_anchors, 4))
-            ious = np.zeros((num_of_anchors))
-            
-            for bboxnum, bbox in enumerate(bboxes_im):
-                if mode == "pixelwise":
-                    bbox_deltas[bboxnum] = calculate_pixelwise_deltas(bbox, anchors, num_of_anchors)
-                else:
-                    bbox_deltas[bboxnum] = calculate_exponential_deltas(bbox, anchors, num_of_anchors)
-                
-                bbox_ious[bboxnum] = calculate_ious(bbox, anchors)
-            
-            # We want to train the anchors to move to the nearest bbox, if there are more --> so even if there are more bboxes, we only have one delta/iou value for each anchor
-            for anchor in range(num_of_anchors):
-                nearest_bbox = np.argmax(bbox_ious[:, anchor])
-                deltas[anchor] = bbox_deltas[nearest_bbox, anchor]
-                ious[anchor] = bbox_ious[nearest_bbox, anchor]
+        # Get the predicted anchors for the positive anchors
+        if mode == 'pixelwise':
+            predicted_boxes = shift_bbox_pixelwise(positive_anchors, selected_boxes)
         else:
-            # If there are no masks on the image, the bbox of it is [0,0,0,0]
-            if np.all(np.equal(bboxes_im, 0)):
-                sampledanchors = random.sample(range(0, num_of_anchors), train_set_size)
-                indices = [[im, x] for x in sampledanchors]
-                batch_of_indices[im] = indices
-                batch_of_deltas[im] = deltas
-                batch_of_labels[im] = boxlabels
-                continue
+            predicted_boxes = shift_bbox_exponential(positive_anchors, selected_boxes)
             
-            else:
-                bbox = bboxes_im[0]
-                if mode == "pixelwise":
-                    deltas = calculate_pixelwise_deltas(bbox, anchors, num_of_anchors)
-                else:
-                    deltas = calculate_exponential_deltas(bbox, anchors, num_of_anchors)
-                ious = calculate_ious(bbox, anchors)
-                
-        # We choose anchors with IoU>0.5 values to be foreground boxes, with IoU<0.1 to be backround boxes
-        num = 0
-        bg_indices = []
-        for anchor in range(num_of_anchors):
-            if ious[anchor] > 0.5:
-                indices[num] = [im, anchor]
-                if num < train_set_size // 2:
-                    num += 1
-            elif ious[anchor] < 0.1:
-                bg_indices.append(anchor)
+        sorted_indicates = tf.argsort(selected_scores, direction = 'DESCENDING')
+        sorted_boxes = tf.cast(tf.gather(predicted_boxes, sorted_indicates), tf.float32)
+        sorted_scores = tf.gather(selected_scores, sorted_indicates)
         
-        sampledanchors = random.sample(bg_indices, train_set_size - num)
-        indices[num:] = [[im, x] for x in sampledanchors]
-        boxlabels[0:num] = 1
-        boxlabels[num:] = 0
-        
-        batch_of_indices[im] = indices
-        batch_of_deltas[im] = deltas
-        batch_of_labels[im] = boxlabels
-        
-    return batch_of_indices, batch_of_deltas, batch_of_labels
