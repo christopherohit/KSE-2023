@@ -180,6 +180,16 @@ def shift_bbox_pixelwise(anchors, predicted_deltas):
 def shift_bbox_exponential(anchors,predicted_deltas):
     raise NotImplementedError('Exponential anchorbox shifting is not implemented')
 
+def nms(boxes, scores, proposal_count = 20, nms_threshold = 0.7, padding = True):
+    selected_indices, selected_scores = tf.image.non_max_suppression_with_scores(boxes, scores, proposal_count, iou_threshold = 0.5)
+    proposals = tf.gather(boxes, selected_indices)
+    proposal_scores = tf.gather(scores, selected_indices)
+    
+    if padding:
+        padding = tf.maximum(proposal_count - tf.shape(selected_indices)[0], 0)
+        proposals = tf.pad(proposals, [(0, padding), (0, 0)])
+    return proposals, proposal_scores, selected_indices
+
 def get_proposals(batch_of_pred_scores,batch_of_pred_deltas,anchors,proposal_count=20,mode='pixelwise'):
     
     batchlen = batch_of_pred_scores.shape[0]
@@ -205,4 +215,18 @@ def get_proposals(batch_of_pred_scores,batch_of_pred_deltas,anchors,proposal_cou
         sorted_indicates = tf.argsort(selected_scores, direction = 'DESCENDING')
         sorted_boxes = tf.cast(tf.gather(predicted_boxes, sorted_indicates), tf.float32)
         sorted_scores = tf.gather(selected_scores, sorted_indicates)
+        # sorted_anchors = tf.cast(tf.gather(positive_anchors, sorted_indicates), tf.float32)
+        
+        proposals[image],_,_ = nms(sorted_boxes, sorted_scores, proposal_count)
+        # origanchors[image] = nms(sorted_anchors, sorted_scores, proposal_count)
+        
+    return proposals
+    
+def freeze(model):
+    for l in model.layers:
+        l.trainable = False
+        
+def unfreeze(model):
+    for l in model.layers:
+        l.trainable = True
         
