@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from utils import get_proposals, draw_bbox
 
-def visualize_rpn_result(image_batch, pred_scores, pred_deltas, anchors, proposal_count = 20, mode = 'pixelwise'):
+def visualize_rpm_result(image_batch, pred_scores, pred_deltas, anchors, proposal_count = 20, mode = 'pixelwise'):
     """
     The function visualizes the region proposal network (RPN) results by plotting the predicted bounding
     boxes on the input images.

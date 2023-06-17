@@ -42,6 +42,18 @@ def calculate_pixelwise_deltas(bbox, anchors, numof):
     return deltas
 
 def calculate_exponential_deltas(bbox, anchors, numof):
+    """
+    The function "calculate_exponential_deltas" is not implemented and raises a NotImplementedError.
+    
+    @param bbox: The bounding box coordinates of an object in the format [x_min, y_min, x_max, y_max]
+    
+    @param anchors: The anchors are pre-defined bounding boxes of different sizes and aspect ratios that
+    are used as a reference to generate region proposals in object detection tasks. These anchors are
+    usually defined based on the size and aspect ratio distribution of objects in the training dataset
+    
+    @param numof: The parameter `numof` is not defined in the function `calculate_exponential_deltas()`.
+    It is unclear what this parameter represents without further context
+    """
     raise NotImplementedError('Exponential anchorbox shifting is not implemented')
 
 def calculate_ious(bbox, anchors):

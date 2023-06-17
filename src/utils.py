@@ -178,9 +178,45 @@ def shift_bbox_pixelwise(anchors, predicted_deltas):
     return batch_of_boxes
 
 def shift_bbox_exponential(anchors,predicted_deltas):
+    """
+    The function shift_bbox_exponential is not implemented and raises a NotImplementedError.
+    
+    @param anchors: The anchors are a tensor of shape (num_anchors, 4) representing the coordinates of
+    the anchor boxes. Each anchor box is represented by four values: (x_min, y_min, x_max, y_max), where
+    (x_min, y_min) are the coordinates of the top-left
+    
+    @param predicted_deltas: The predicted_deltas parameter likely contains the predicted offsets or
+    changes to be applied to the anchor boxes. These offsets are used to shift the anchor boxes to
+    better fit the object being detected in an image
+    """
     raise NotImplementedError('Exponential anchorbox shifting is not implemented')
 
 def nms(boxes, scores, proposal_count = 20, nms_threshold = 0.7, padding = True):
+    """
+    The function performs non-maximum suppression on a set of bounding boxes and their corresponding
+    scores, returning a subset of the boxes with the highest scores.
+    
+    @param boxes: A tensor of shape (num_boxes, 4) representing the bounding boxes in the format [ymin,
+    xmin, ymax, xmax]
+    
+    @param scores: The confidence scores associated with each bounding box proposal
+    
+    @param proposal_count: The maximum number of proposals to be selected after non-maximum suppression
+    (NMS), defaults to 20 (optional)
+    
+    @param nms_threshold: The non-maximum suppression threshold used to filter out overlapping bounding
+    boxes. Bounding boxes with an intersection-over-union (IoU) overlap greater than this threshold will
+    be suppressed
+   
+    @param padding: A boolean parameter that determines whether to pad the proposals to match the
+    proposal_count. If padding is True, the function will pad the proposals with zeros to match the
+    proposal_count. If padding is False, the function will return only the selected proposals without
+    padding, defaults to True (optional)
+    
+    @return: three values: proposals (a tensor of selected bounding boxes), proposal_scores (a tensor of
+    scores corresponding to the selected bounding boxes), and selected_indices (a tensor of indices of
+    the selected bounding boxes in the original boxes tensor).
+    """
     selected_indices, selected_scores = tf.image.non_max_suppression_with_scores(boxes, scores, proposal_count, iou_threshold = 0.5)
     proposals = tf.gather(boxes, selected_indices)
     proposal_scores = tf.gather(scores, selected_indices)
@@ -191,6 +227,31 @@ def nms(boxes, scores, proposal_count = 20, nms_threshold = 0.7, padding = True)
     return proposals, proposal_scores, selected_indices
 
 def get_proposals(batch_of_pred_scores,batch_of_pred_deltas,anchors,proposal_count=20,mode='pixelwise'):
+    """
+    This function takes in predicted scores and deltas, along with anchors, and returns a set of
+    proposals for each image in the batch.
+    
+    @param batch_of_pred_scores: A batch of predicted scores for each anchor box in the input image. The
+    shape of this tensor is (batch_size, num_anchors, num_classes), where num_classes includes the
+    background class
+    
+    @param batch_of_pred_deltas: A batch of predicted bounding box deltas for each image in the batch.
+    These deltas are used to adjust the anchor boxes to generate the final predicted bounding boxes
+    
+    @param anchors: An array of anchor boxes used for object detection. These anchor boxes are
+    pre-defined boxes of different sizes and aspect ratios that are used to generate region proposals
+    for objects in an image
+   
+    @param proposal_count: The number of proposals to generate per image, defaults to 20 (optional)
+    
+    @param mode: The mode parameter specifies the method used to shift the bounding boxes. It can be
+    either 'pixelwise' or 'exponential', defaults to pixelwise (optional)
+    
+    @return: a numpy array of proposals for each image in the batch. The proposals are predicted
+    bounding boxes for objects in the image, generated using the predicted scores and deltas, and
+    selected using non-maximum suppression (NMS) to remove overlapping boxes. The shape of the returned
+    array is (batchlen, proposal_count, 4), where batchlen is the number of images in the batch
+    """
     
     batchlen = batch_of_pred_scores.shape[0]
     proposals, origanchors = np.zeros((batchlen, proposal_count, 4))
@@ -223,10 +284,30 @@ def get_proposals(batch_of_pred_scores,batch_of_pred_deltas,anchors,proposal_cou
     return proposals
     
 def freeze(model):
+    
+    """
+    The function "freeze" sets all layers in a given model to be untrainable.
+    
+    @param model: The "model" parameter is a deep learning model object that contains multiple layers.
+    The purpose of the "freeze" function is to set all the layers in the model to be non-trainable,
+    meaning that their weights will not be updated during the training process. This can be useful when
+    you want
+    """
+    
     for l in model.layers:
         l.trainable = False
         
 def unfreeze(model):
+    
+    """
+    The function unfreeze sets all layers in a given model to be trainable.
+    
+    @param model: The "model" parameter is referring to a machine learning model that has been
+    previously trained and frozen. Freezing a model means that the weights of the model's layers are
+    fixed and not updated during training. The "unfreeze" function is used to unfreeze the layers of the
+    model so that they
+    """
+    
     for l in model.layers:
         l.trainable = True
         
